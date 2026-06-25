@@ -27,6 +27,15 @@ A ROS 2 package that uses [BehaviorTree.CPP v4](https://www.behaviortree.dev/) t
                              └── SUCCESS ──▶ [Report mission complete]
 ```
 
+## Demo
+
+![BT execution output](image.jpeg)
+
+> Expected output (no robot connected): CheckBattery passes, Nav2 server unavailable triggers reroute, CheckObstacleAhead fails (no LiDAR) — correct BT failure-handling behavior. Connect Nav2 or run in Gazebo for full mission success.
+
+---
+
+
 The entire mission logic lives in a single XML file (`config/nav_mission.xml`) — swap it at runtime with `bt_xml:=...` to change mission behaviour without recompiling.
 
 ---
