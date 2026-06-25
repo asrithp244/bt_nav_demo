@@ -1,0 +1,71 @@
+<!--
+  bt_nav_demo — BehaviorTree.CPP v4 mission tree
+
+  Mission:
+    1. Check battery is above threshold.
+       If low → abort (operator must charge before deploying).
+    2. Navigate to the PRIMARY goal (x=3.0, y=1.5).
+    3. If navigation fails (obstacle blocks path):
+         a. Check there really is an obstacle ahead.
+         b. Set an alternate goal (x=1.0, y=3.0) to go around.
+         c. Navigate to the alternate goal.
+    4. Report mission success.
+
+  Node types used:
+    CheckBattery          — Condition: reads /battery_state, returns SUCCESS if > threshold
+    NavigateToPose        — Async action: sends goal to Nav2, returns SUCCESS/FAILURE/RUNNING
+    CheckObstacleAhead    — Condition: reads /scan, returns SUCCESS if obstacle < 0.5 m
+    SetAlternateGoal      — SyncAction: writes alternate_x/y to blackboard
+    ReportSuccess         — SyncAction: logs "Mission complete" to ROS console
+-->
+
+<root BTCPP_format="4">
+  <BehaviorTree ID="NavMission">
+
+    <Sequence name="mission_root">
+
+      <!-- Gate 1: battery must be sufficient before we start -->
+      <CheckBattery
+        battery_topic="/battery_state"
+        min_percent="20.0" />
+
+      <!-- Gate 2: drive to primary goal; if it fails, try the alternate path -->
+      <Fallback name="navigate_or_reroute">
+
+        <!-- Primary navigation attempt -->
+        <NavigateToPose
+          name="nav_to_primary"
+          goal_x="3.0"
+          goal_y="1.5"
+          goal_yaw="0.0"
+          nav_action_server="/navigate_to_pose" />
+
+        <!-- Recovery sequence: only runs if primary nav failed -->
+        <Sequence name="reroute_sequence">
+
+          <CheckObstacleAhead
+            scan_topic="/scan"
+            obstacle_distance_m="0.5" />
+
+          <SetAlternateGoal
+            alternate_x="1.0"
+            alternate_y="3.0" />
+
+          <NavigateToPose
+            name="nav_to_alternate"
+            goal_x="{alternate_x}"
+            goal_y="{alternate_y}"
+            goal_yaw="0.0"
+            nav_action_server="/navigate_to_pose" />
+
+        </Sequence>
+
+      </Fallback>
+
+      <!-- Mission complete -->
+      <ReportSuccess message="Navigation mission complete." />
+
+    </Sequence>
+
+  </BehaviorTree>
+</root>
