@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    container:
+      image: ros:humble
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ros2_ws/src/bt_nav_demo
+
+      - name: Install dependencies
+        run: |
+          apt-get update -q
+          rosdep init || true
+          rosdep update
+          cd ros2_ws
+          rosdep install --from-paths src --ignore-src -r -y
+          apt-get install -y \
+            ros-humble-behaviortree-cpp \
+            ros-humble-nav2-msgs \
+            ros-humble-gazebo-msgs \
+            ros-humble-yaml-cpp-vendor
+
+      - name: Build bt_nav_demo
+        run: |
+          . /opt/ros/humble/setup.sh
+          cd ros2_ws
+          colcon build --packages-select bt_nav_demo \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release \
+            --event-handlers console_direct+
+
+      - name: Build bt_nav_eval
+        run: |
+          . /opt/ros/humble/setup.sh
+          cd ros2_ws
+          colcon build --packages-select bt_nav_eval \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release \
+            --event-handlers console_direct+
+
+      - name: Test bt_nav_eval
+        run: |
+          . /opt/ros/humble/setup.sh
+          cd ros2_ws
+          . install/setup.sh
+          colcon test --packages-select bt_nav_eval \
+            --event-handlers console_direct+
+          colcon test-result --verbose
