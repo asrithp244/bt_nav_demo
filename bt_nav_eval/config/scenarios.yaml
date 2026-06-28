@@ -30,11 +30,6 @@
 
 scenarios:
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # All goal poses are scaled to fit within the turtlebot3_world (~3 m diameter).
-  # Robot starts at (0, 0). Max safe goal radius ≈ 1.5 m.
-  # ─────────────────────────────────────────────────────────────────────────
-
   - id: "s001_straight_corridor"
     description: "Straight corridor with one central static obstacle"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
@@ -46,7 +41,6 @@ scenarios:
     timeout_sec: 45
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s002_narrow_gap"
     description: "Two walls forming a 0.6 m gap — tests DWB planner squeeze"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
@@ -61,41 +55,34 @@ scenarios:
     timeout_sec: 60
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s003_u_shaped_dead_end"
     description: "U-shaped pocket — robot must detect dead end and recover"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
     goal_pose:  {x: 1.2, y: 0.0, yaw: 0.0}
     obstacles:
-      # back wall of the U
       - type: static_box
         pose: {x: 1.4, y: 0.0}
         size: {w: 0.15, h: 0.8}
-      # top arm
       - type: static_box
         pose: {x: 1.0, y:  0.4}
         size: {w: 0.8, h: 0.15}
-      # bottom arm
       - type: static_box
         pose: {x: 1.0, y: -0.4}
         size: {w: 0.8, h: 0.15}
     timeout_sec: 60
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s004_t_junction"
     description: "Wall blocks straight path — goal is around the corner"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
     goal_pose:  {x: 1.0, y: 1.0, yaw: 1.5708}
     obstacles:
-      # vertical wall blocking direct path at x=0.6
       - type: static_box
         pose: {x: 0.6, y: 0.4}
         size: {w: 0.15, h: 1.0}
     timeout_sec: 60
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s005_multiple_scattered"
     description: "Five scattered obstacles — exercises global path planner"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
@@ -119,7 +106,6 @@ scenarios:
     timeout_sec: 60
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s006_long_path_mid_obstacles"
     description: "Diagonal run with two mid-course obstacles — tests sustained navigation"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
@@ -134,20 +120,17 @@ scenarios:
     timeout_sec: 90
     success_threshold_m: 0.30
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s007_wall_adjacent_goal"
     description: "Goal 0.35 m from a wall — tests precision final approach"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
     goal_pose:  {x: 0.0, y: -1.2, yaw: -1.5708}
     obstacles:
-      # wall at y = -1.55 (goal is 0.35 m clearance)
       - type: static_box
         pose: {x: 0.0, y: -1.6}
         size: {w: 1.0, h: 0.15}
     timeout_sec: 45
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s008_diagonal_obstacle_field"
     description: "Obstacles arranged diagonally — angled approach path"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.7854}
@@ -165,13 +148,11 @@ scenarios:
     timeout_sec: 60
     success_threshold_m: 0.30
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s009_goal_unreachable"
     description: "Goal completely enclosed — tests graceful FAILURE handling"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
     goal_pose:  {x: 1.0, y: 0.0, yaw: 0.0}
     obstacles:
-      # tight box enclosure around the goal — planner cannot find path
       - type: static_box
         pose: {x: 1.0, y:  0.35}
         size: {w: 0.8, h: 0.15}
@@ -187,7 +168,6 @@ scenarios:
     timeout_sec: 30
     success_threshold_m: 0.25
 
-  # ─────────────────────────────────────────────────────────────────────────
   - id: "s010_clear_baseline"
     description: "No obstacles — baseline efficiency ceiling for comparison"
     start_pose: {x: 0.0, y: 0.0, yaw: 0.0}
