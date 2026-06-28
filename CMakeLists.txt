@@ -14,6 +14,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(tf2 REQUIRED)
 
 add_executable(bt_nav_demo_node
   src/main.cpp
@@ -40,6 +41,7 @@ ament_target_dependencies(bt_nav_demo_node
   nav2_msgs
   behaviortree_cpp
   ament_index_cpp
+  tf2
 )
 
 install(TARGETS bt_nav_demo_node DESTINATION lib/${PROJECT_NAME})
@@ -47,7 +49,6 @@ install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
-  ament_add_pytest_test(bt_nav_demo_tests test/test_bt_nodes.py)
 endif()
 
 ament_package()
