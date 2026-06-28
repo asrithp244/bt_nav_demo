@@ -1,42 +1,70 @@
 # bt_nav_demo — Autonomous Navigation with BehaviorTree.CPP + ROS 2
 
-A ROS 2 package that uses [BehaviorTree.CPP v4](https://www.behaviortree.dev/) to implement a **mission-level autonomous task**: navigate a robot to a target, check battery and obstacle state in real time, and automatically re-route around obstacles when the primary path fails.
+A ROS 2 package that uses [BehaviorTree.CPP v4](https://www.behaviortree.dev/) to implement a mission-level autonomous task: navigate a robot to a target, check battery and obstacle state in real time, and automatically re-route around obstacles when the primary path fails.
 
-> **Skills demonstrated:** `BehaviorTree.CPP` · `ROS 2 Humble` · `Nav2 action client` · `rclcpp_action` · `LiDAR processing` · `C++17` · `async state machine`
+This repo also includes **bt_nav_eval**, a closed-loop scenario evaluation harness built on top of the same Nav2 stack. It runs a TurtleBot3 through 10 procedurally-defined obstacle scenarios in Gazebo, collects per-scenario metrics (path efficiency, clearance, recovery count, velocity), and writes a structured JSON + Markdown report.
+
+> **Skills demonstrated:** `BehaviorTree.CPP` · `ROS 2 Humble` · `Nav2` · `Gazebo` · `rclcpp_action` · `AMCL` · `DWB planner` · `LiDAR processing` · `C++17` · `async state machines` · `closed-loop evaluation`
 
 ---
-
-## What it does
-
-```
-[Battery OK?] ──fail──▶ ABORT
-      │ ok
-      ▼
-[Navigate to primary goal (3.0, 1.5)]
-      │
-      ├── SUCCESS ──▶ [Report mission complete]
-      │
-      └── FAILURE ──▶ [Obstacle ahead?]
-                             │ yes
-                             ▼
-                    [Set alternate goal (1.0, 3.0)]
-                             │
-                             ▼
-                    [Navigate to alternate goal]
-                             │
-                             └── SUCCESS ──▶ [Report mission complete]
-```
 
 ## Demo
 
-![BT execution output](image.jpeg)
+**bt_nav_eval full run (Gazebo + RViz side by side):** https://www.youtube.com/watch?v=lsS41a8zwlo
 
-> Expected output (no robot connected): CheckBattery passes, Nav2 server unavailable triggers reroute, CheckObstacleAhead fails (no LiDAR) — correct BT failure-handling behavior. Connect Nav2 or run in Gazebo for full mission success.
+![BT execution output](image.jpeg)
 
 ---
 
+## What bt_nav_demo does
+
+```
+[Battery OK?] --fail--> ABORT
+      | ok
+      v
+[Navigate to primary goal (3.0, 1.5)]
+      |
+      +-- SUCCESS --> [Report mission complete]
+      |
+      +-- FAILURE --> [Obstacle ahead?]
+                             | yes
+                             v
+                    [Set alternate goal (1.0, 3.0)]
+                             |
+                             v
+                    [Navigate to alternate goal]
+                             |
+                             +-- SUCCESS --> [Report mission complete]
+```
 
 The entire mission logic lives in a single XML file (`config/nav_mission.xml`) — swap it at runtime with `bt_xml:=...` to change mission behaviour without recompiling.
+
+---
+
+## What bt_nav_eval does
+
+bt_nav_eval is a standalone ROS 2 node that acts as a test harness for Nav2 agents. For each scenario it:
+
+1. Spawns SDF box obstacles into Gazebo via the `/spawn_entity` service
+2. Sends a `NavigateToPose` action goal and monitors feedback in real time
+3. Collects odometry-integrated path length, LiDAR minimum clearance, cmd_vel statistics, and recovery count
+4. Tears down obstacles and moves to the next scenario
+5. Writes `metrics.json` and `evaluation_report.md` to a configurable output directory
+
+**Scenarios run:**
+
+| ID | Description | Result |
+|---|---|---|
+| s001 | Straight corridor, one obstacle | FAILURE |
+| s002 | Narrow 0.6 m gap between walls | SUCCESS |
+| s003 | U-shaped dead end, forces recovery | SUCCESS |
+| s004 | T-junction, goal around a corner | SUCCESS |
+| s005 | Five scattered obstacles | TIMEOUT |
+| s006 | Diagonal run with mid-course obstacles | SUCCESS |
+| s007 | Goal 0.35 m from a wall | SUCCESS |
+| s008 | Diagonal obstacle field | TIMEOUT |
+| s009 | Goal completely enclosed (graceful failure test) | TIMEOUT |
+| s010 | Clear baseline, no obstacles | TIMEOUT |
 
 ---
 
@@ -132,15 +160,31 @@ Example: add a second waypoint after the primary goal:
 
 ---
 
+## Running bt_nav_eval
+
+```bash
+# Terminal 1 - Gazebo with TurtleBot3 world
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+
+# Terminal 2 - Nav2 navigation stack
+export TURTLEBOT3_MODEL=burger
+ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True
+
+# Set 2D Pose Estimate in RViz, then:
+
+# Terminal 3 - run the evaluation harness
+source ~/ros2_ws/install/setup.bash
+ros2 launch bt_nav_eval bt_nav_eval.launch.py output_dir:=$HOME/eval_results
+```
+
+Results are written to `~/eval_results/metrics.json` and `~/eval_results/evaluation_report.md`.
+
+---
+
 ## Tests
 
 ```bash
-colcon test --packages-select bt_nav_demo
+colcon test --packages-select bt_nav_eval
 colcon test-result --verbose
-```
-
-For Nav2 integration tests:
-
-```bash
-FULL_NAV2=1 pytest test/test_bt_nodes.py -v
 ```
