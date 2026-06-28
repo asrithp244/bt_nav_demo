@@ -14,7 +14,7 @@ This repo also includes **bt_nav_eval**, a closed-loop scenario evaluation harne
 
 Click the thumbnail to watch on YouTube:
 
-[![bt_nav_eval demo](https://img.youtube.com/vi/lsS41a8zwlo/maxresdefault.jpg)](https://www.youtube.com/watch?v=lsS41a8zwlo)
+[![bt_nav_eval demo](https://img.youtube.com/vi/lsS41a8zwlo/hqdefault.jpg)](https://www.youtube.com/watch?v=lsS41a8zwlo)
 
 **bt_nav_demo — BehaviorTree.CPP mission execution output**
 
