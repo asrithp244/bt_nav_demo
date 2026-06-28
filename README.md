@@ -10,7 +10,15 @@ This repo also includes **bt_nav_eval**, a closed-loop scenario evaluation harne
 
 ## Demo
 
-**bt_nav_eval full run (Gazebo + RViz side by side):** https://www.youtube.com/watch?v=lsS41a8zwlo
+**bt_nav_eval — 10 scenario closed-loop eval (Gazebo + RViz side by side)**
+
+Click the thumbnail to watch on YouTube:
+
+[![bt_nav_eval demo](https://img.youtube.com/vi/lsS41a8zwlo/maxresdefault.jpg)](https://www.youtube.com/watch?v=lsS41a8zwlo)
+
+**bt_nav_demo — BehaviorTree.CPP mission execution output**
+
+The terminal output below shows the BT ticking through CheckBattery, NavigateToPose, and the fallback reroute branch. No robot required to see the logic fire correctly.
 
 ![BT execution output](image.jpeg)
 
