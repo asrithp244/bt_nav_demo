@@ -63,9 +63,9 @@ bt_nav_eval is a standalone ROS 2 node that acts as a test harness for Nav2 agen
 
 | ID | Description | Result | Notes |
 |---|---|---|---|
-| s001 | Straight corridor, one obstacle | FAILURE | Goal rejected by Nav2; likely the spawned obstacle landed inside the costmap inflation zone blocking the only viable path at this map scale |
+| s001 | Straight corridor, one obstacle | FAILURE | Goal accepted, robot moved 0.43 m with 16 recoveries before Nav2 aborted; hypothesis: costmap inflation around the spawned obstacle left no viable path to the goal at this scale |
 | s002 | Narrow 0.6 m gap between walls | SUCCESS | DWB planner squeezed through after 8 recoveries; path_length 2.23 m, efficiency 0.67 |
-| s003 | U-shaped dead end, forces recovery | SUCCESS | 3 recoveries triggered; robot backed out and rerouted correctly |
+| s003 | U-shaped dead end, forces recovery | SUCCESS | Goal accepted and succeeded in 0.1 s with 0 recoveries; robot was already near the goal position from the previous scenario |
 | s004 | T-junction, goal around a corner | SUCCESS | 24 s, path_length 1.92 m, 0 recoveries; global planner found corner route cleanly |
 | s005 | Five scattered obstacles | TIMEOUT | Robot made forward progress (0.97 m, 5 recoveries) but did not reach goal before timeout; hypothesis: obstacle spacing created a corridor too narrow for the DWB planner to commit to within the time limit |
 | s006 | Diagonal run with mid-course obstacles | SUCCESS | 51 s, path_length 2.54 m; 4 recoveries navigating around two diagonal boxes |
@@ -83,21 +83,30 @@ bt_nav_eval is a standalone ROS 2 node that acts as a test harness for Nav2 agen
 The full mission tree lives in `config/nav_mission.xml`. Here is the core structure:
 
 ```xml
-<BehaviorTree ID="MainTree">
-  <Sequence name="mission">
-    <CheckBattery min_percent="20.0" />
-    <NavigateToPose goal_x="3.0" goal_y="1.5" goal_yaw="0.0" />
-    <Fallback name="obstacle_recovery">
-      <NavigateToPose goal_x="3.0" goal_y="1.5" goal_yaw="0.0" />
-      <Sequence name="reroute">
-        <CheckObstacleAhead distance_threshold="0.5" />
-        <SetAlternateGoal alt_x="1.0" alt_y="3.0" />
-        <NavigateToPose goal_x="{alt_x}" goal_y="{alt_y}" goal_yaw="0.0" />
-      </Sequence>
-    </Fallback>
-    <ReportSuccess message="Mission complete" />
-  </Sequence>
-</BehaviorTree>
+<root BTCPP_format="4">
+  <BehaviorTree ID="NavMission">
+    <Sequence name="mission_root">
+
+      <CheckBattery battery_topic="/battery_state" min_percent="20.0" />
+
+      <Fallback name="navigate_or_reroute">
+        <NavigateToPose name="nav_to_primary"
+          goal_x="3.0" goal_y="1.5" goal_yaw="0.0"
+          nav_action_server="/navigate_to_pose" />
+
+        <Sequence name="reroute_sequence">
+          <CheckObstacleAhead scan_topic="/scan" obstacle_distance_m="0.5" />
+          <SetAlternateGoal alternate_x="1.0" alternate_y="3.0" />
+          <NavigateToPose name="nav_to_alternate"
+            goal_x="{alternate_x}" goal_y="{alternate_y}" goal_yaw="0.0"
+            nav_action_server="/navigate_to_pose" />
+        </Sequence>
+      </Fallback>
+
+      <ReportSuccess message="Navigation mission complete." />
+    </Sequence>
+  </BehaviorTree>
+</root>
 ```
 
 ---
