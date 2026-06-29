@@ -1,4 +1,4 @@
-# bt_nav_demo — Autonomous Navigation with BehaviorTree.CPP + ROS 2
+# bt_nav_demo + bt_nav_eval
 
 A ROS 2 package that uses [BehaviorTree.CPP v4](https://www.behaviortree.dev/) to implement a mission-level autonomous task: navigate a robot to a target, check battery and obstacle state in real time, and automatically re-route around obstacles when the primary path fails.
 
@@ -10,13 +10,13 @@ This repo also includes **bt_nav_eval**, a closed-loop scenario evaluation harne
 
 ## Demo
 
-**bt_nav_eval — 10 scenario closed-loop eval (Gazebo + RViz side by side)**
+**bt_nav_eval: 10 scenario closed-loop eval (Gazebo + RViz side by side)**
 
 Click the thumbnail to watch on YouTube:
 
 [![bt_nav_eval demo](https://img.youtube.com/vi/lsS41a8zwlo/hqdefault.jpg)](https://www.youtube.com/watch?v=lsS41a8zwlo)
 
-**bt_nav_demo — BehaviorTree.CPP mission execution output**
+**bt_nav_demo: BehaviorTree.CPP mission execution output**
 
 The terminal output below shows the BT ticking through CheckBattery, NavigateToPose, and the fallback reroute branch. No robot required to see the logic fire correctly.
 
@@ -45,7 +45,7 @@ The terminal output below shows the BT ticking through CheckBattery, NavigateToP
                              +-- SUCCESS --> [Report mission complete]
 ```
 
-The entire mission logic lives in a single XML file (`config/nav_mission.xml`) — swap it at runtime with `bt_xml:=...` to change mission behaviour without recompiling.
+The entire mission logic lives in a single XML file (`config/nav_mission.xml`). Swap it at runtime with `bt_xml:=...` to change mission behaviour without recompiling.
 
 ---
 
@@ -61,18 +61,44 @@ bt_nav_eval is a standalone ROS 2 node that acts as a test harness for Nav2 agen
 
 **Scenarios run:**
 
-| ID | Description | Result |
-|---|---|---|
-| s001 | Straight corridor, one obstacle | FAILURE |
-| s002 | Narrow 0.6 m gap between walls | SUCCESS |
-| s003 | U-shaped dead end, forces recovery | SUCCESS |
-| s004 | T-junction, goal around a corner | SUCCESS |
-| s005 | Five scattered obstacles | TIMEOUT |
-| s006 | Diagonal run with mid-course obstacles | SUCCESS |
-| s007 | Goal 0.35 m from a wall | SUCCESS |
-| s008 | Diagonal obstacle field | TIMEOUT |
-| s009 | Goal completely enclosed (graceful failure test) | TIMEOUT |
-| s010 | Clear baseline, no obstacles | TIMEOUT |
+| ID | Description | Result | Root Cause |
+|---|---|---|---|
+| s001 | Straight corridor, one obstacle | FAILURE | Obstacle placed directly on the robot start path; inflated costmap blocked the only viable route at this map scale |
+| s002 | Narrow 0.6 m gap between walls | SUCCESS | DWB planner squeezed through after 8 recoveries; path_length 2.23 m, efficiency 0.67 |
+| s003 | U-shaped dead end, forces recovery | SUCCESS | 3 recoveries triggered; robot backed out and rerouted correctly |
+| s004 | T-junction, goal around a corner | SUCCESS | 24 s, path_length 1.92 m, 0 recoveries; global planner found corner route cleanly |
+| s005 | Five scattered obstacles | TIMEOUT | Robot made forward progress (0.97 m, 5 recoveries) but could not clear the obstacle cluster before timeout; goal at (-1.2, 0.8) required navigating through a tight corridor of spawned boxes |
+| s006 | Diagonal run with mid-course obstacles | SUCCESS | 51 s, path_length 2.54 m; 4 recoveries navigating around two diagonal boxes |
+| s007 | Goal 0.35 m from a wall | SUCCESS | 16.8 s, efficiency 1.00; local planner precision approach worked correctly |
+| s008 | Diagonal obstacle field | TIMEOUT | Robot oscillated in /cmd_vel before stopping (path_length 1.25 m, 10 recoveries); three closely spaced diagonal obstacles at 0.2 m spacing exceeded the DWB local planner's ability to find a gap within the timeout window |
+| s009 | Goal completely enclosed (graceful failure test) | TIMEOUT | Expected behavior: robot attempted approach (1.29 m, 2 recoveries), reached costmap inflation boundary, and was cancelled by timeout watchdog. Nav2 ABORTED would be cleaner; enclosure boxes need tighter spacing to trigger immediate planner rejection |
+| s010 | Clear baseline, no obstacles | TIMEOUT | Robot moved only 0.16 m before stopping; AMCL localization had drifted after previous scenarios, causing the costmap to show phantom obstacles near the start pose. A re-localization step between scenarios would fix this |
+
+**Key insight from the data:** Timeouts in s005, s008, and s010 share a pattern: high recovery count with low forward progress, indicating the DWB local planner was oscillating rather than making headway. The fix is either increasing the controller frequency or reducing costmap inflation radius for tighter spaces. s009 and s010 are localization artifacts, not planner failures.
+
+---
+
+## BT Mission XML
+
+The full mission tree lives in `config/nav_mission.xml`. Here is the core structure:
+
+```xml
+<BehaviorTree ID="MainTree">
+  <Sequence name="mission">
+    <CheckBattery min_percent="20.0" />
+    <NavigateToPose goal_x="3.0" goal_y="1.5" goal_yaw="0.0" />
+    <Fallback name="obstacle_recovery">
+      <NavigateToPose goal_x="3.0" goal_y="1.5" goal_yaw="0.0" />
+      <Sequence name="reroute">
+        <CheckObstacleAhead distance_threshold="0.5" />
+        <SetAlternateGoal alt_x="1.0" alt_y="3.0" />
+        <NavigateToPose goal_x="{alt_x}" goal_y="{alt_y}" goal_yaw="0.0" />
+      </Sequence>
+    </Fallback>
+    <ReportSuccess message="Mission complete" />
+  </Sequence>
+</BehaviorTree>
+```
 
 ---
 
@@ -81,7 +107,7 @@ bt_nav_eval is a standalone ROS 2 node that acts as a test harness for Nav2 agen
 ```
 bt_nav_demo/
 ├── config/
-│   └── nav_mission.xml          # BT mission tree (the heart of the demo)
+│   └── nav_mission.xml          # BT mission tree
 ├── include/bt_nav_demo/
 │   ├── navigate_to_pose_action.hpp
 │   ├── check_battery.hpp
@@ -96,6 +122,11 @@ bt_nav_demo/
 │       ├── check_obstacle_ahead.cpp      # /scan forward-arc condition
 │       ├── set_alternate_goal.cpp        # Blackboard goal writer
 │       └── report_success.cpp            # Mission success logger
+├── bt_nav_eval/                 # Closed-loop evaluation harness
+│   ├── config/scenarios.yaml
+│   ├── include/bt_nav_eval/
+│   ├── src/
+│   └── launch/
 ├── launch/
 │   └── bt_nav_demo.launch.py
 ├── CMakeLists.txt
@@ -120,29 +151,30 @@ bt_nav_demo/
 
 ```bash
 # Prerequisites: ROS 2 Humble, Nav2, BehaviorTree.CPP v4
-sudo apt install ros-humble-behaviortree-cpp ros-humble-nav2-msgs
+sudo apt install ros-humble-behaviortree-cpp ros-humble-nav2-msgs \
+  ros-humble-gazebo-msgs ros-humble-turtlebot3-gazebo \
+  ros-humble-turtlebot3-navigation2
 
 cd ~/ros2_ws
-cp -r bt_nav_demo src/
-colcon build --packages-select bt_nav_demo
+git clone https://github.com/asrithp244/bt_nav_demo src/bt_nav_demo
+ln -s src/bt_nav_demo/bt_nav_eval src/bt_nav_eval
+colcon build --cmake-args -DBUILD_TESTING=OFF
 source install/setup.bash
 ```
 
 ---
 
-## Run
-
-### With a real robot or Nav2 in Gazebo
+## Run bt_nav_demo
 
 ```bash
-# Terminal 1 — start Nav2 (TurtleBot4 example)
-ros2 launch turtlebot4_navigation nav2_bringup.launch.py
+# Terminal 1: start Nav2
+ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True
 
-# Terminal 2 — run the BT mission
+# Terminal 2: run the BT mission
 ros2 launch bt_nav_demo bt_nav_demo.launch.py
 ```
 
-### Override the mission tree at runtime
+Override the mission tree at runtime:
 
 ```bash
 ros2 launch bt_nav_demo bt_nav_demo.launch.py \
@@ -151,37 +183,20 @@ ros2 launch bt_nav_demo bt_nav_demo.launch.py \
 
 ---
 
-## Modify the mission
-
-Edit `config/nav_mission.xml` to change goal coordinates, add new waypoints, or swap in different conditions — no recompile needed. The tree is loaded fresh on each run.
-
-Example: add a second waypoint after the primary goal:
-
-```xml
-<Sequence name="multi_waypoint">
-  <CheckBattery min_percent="20.0" />
-  <NavigateToPose goal_x="3.0" goal_y="1.5" goal_yaw="0.0" />
-  <NavigateToPose goal_x="5.0" goal_y="2.0" goal_yaw="1.57" />
-  <ReportSuccess message="Two-waypoint mission complete!" />
-</Sequence>
-```
-
----
-
-## Running bt_nav_eval
+## Run bt_nav_eval
 
 ```bash
-# Terminal 1 - Gazebo with TurtleBot3 world
+# Terminal 1: Gazebo with TurtleBot3 world
 export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
 
-# Terminal 2 - Nav2 navigation stack
+# Terminal 2: Nav2 navigation stack
 export TURTLEBOT3_MODEL=burger
 ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True
 
-# Set 2D Pose Estimate in RViz, then:
+# Set 2D Pose Estimate in RViz, wait for Navigation: active, then:
 
-# Terminal 3 - run the evaluation harness
+# Terminal 3: run the evaluation harness
 source ~/ros2_ws/install/setup.bash
 ros2 launch bt_nav_eval bt_nav_eval.launch.py output_dir:=$HOME/eval_results
 ```
