@@ -61,20 +61,20 @@ bt_nav_eval is a standalone ROS 2 node that acts as a test harness for Nav2 agen
 
 **Scenarios run:**
 
-| ID | Description | Result | Root Cause |
+| ID | Description | Result | Notes |
 |---|---|---|---|
-| s001 | Straight corridor, one obstacle | FAILURE | Obstacle placed directly on the robot start path; inflated costmap blocked the only viable route at this map scale |
+| s001 | Straight corridor, one obstacle | FAILURE | Goal rejected by Nav2; likely the spawned obstacle landed inside the costmap inflation zone blocking the only viable path at this map scale |
 | s002 | Narrow 0.6 m gap between walls | SUCCESS | DWB planner squeezed through after 8 recoveries; path_length 2.23 m, efficiency 0.67 |
 | s003 | U-shaped dead end, forces recovery | SUCCESS | 3 recoveries triggered; robot backed out and rerouted correctly |
 | s004 | T-junction, goal around a corner | SUCCESS | 24 s, path_length 1.92 m, 0 recoveries; global planner found corner route cleanly |
-| s005 | Five scattered obstacles | TIMEOUT | Robot made forward progress (0.97 m, 5 recoveries) but could not clear the obstacle cluster before timeout; goal at (-1.2, 0.8) required navigating through a tight corridor of spawned boxes |
+| s005 | Five scattered obstacles | TIMEOUT | Robot made forward progress (0.97 m, 5 recoveries) but did not reach goal before timeout; hypothesis: obstacle spacing created a corridor too narrow for the DWB planner to commit to within the time limit |
 | s006 | Diagonal run with mid-course obstacles | SUCCESS | 51 s, path_length 2.54 m; 4 recoveries navigating around two diagonal boxes |
 | s007 | Goal 0.35 m from a wall | SUCCESS | 16.8 s, efficiency 1.00; local planner precision approach worked correctly |
-| s008 | Diagonal obstacle field | TIMEOUT | Robot oscillated in /cmd_vel before stopping (path_length 1.25 m, 10 recoveries); three closely spaced diagonal obstacles at 0.2 m spacing exceeded the DWB local planner's ability to find a gap within the timeout window |
-| s009 | Goal completely enclosed (graceful failure test) | TIMEOUT | Expected behavior: robot attempted approach (1.29 m, 2 recoveries), reached costmap inflation boundary, and was cancelled by timeout watchdog. Nav2 ABORTED would be cleaner; enclosure boxes need tighter spacing to trigger immediate planner rejection |
-| s010 | Clear baseline, no obstacles | TIMEOUT | Robot moved only 0.16 m before stopping; AMCL localization had drifted after previous scenarios, causing the costmap to show phantom obstacles near the start pose. A re-localization step between scenarios would fix this |
+| s008 | Diagonal obstacle field | TIMEOUT | path_length 1.25 m, 10 recoveries; robot made progress but did not reach goal; hypothesis: closely spaced diagonal obstacles caused repeated replanning cycles that exhausted the timeout |
+| s009 | Goal completely enclosed (graceful failure test) | TIMEOUT | Expected near-failure: robot attempted approach (1.29 m, 2 recoveries) and was cancelled by the watchdog. Enclosure spacing may need to be tighter to trigger immediate planner rejection rather than timeout |
+| s010 | Clear baseline, no obstacles | TIMEOUT | Robot moved only 0.16 m; hypothesis: AMCL localization drifted across 9 prior scenarios, causing phantom costmap inflation near the start pose. A re-localization step between scenarios would likely fix this |
 
-**Key insight from the data:** Timeouts in s005, s008, and s010 share a pattern: high recovery count with low forward progress, indicating the DWB local planner was oscillating rather than making headway. The fix is either increasing the controller frequency or reducing costmap inflation radius for tighter spaces. s009 and s010 are localization artifacts, not planner failures.
+**Observed pattern:** s005, s008, and s010 all show high recovery count with low forward progress. The hypothesis is DWB local planner oscillation under tight obstacle spacing or degraded localization. Potential fixes: reduce costmap inflation radius, increase controller frequency, or add a re-localization step between scenarios.
 
 ---
 
