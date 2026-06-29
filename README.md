@@ -1,4 +1,4 @@
-# bt_nav_demo + bt_nav_eval
+# bt_nav_demo + bt_nav_eval and Closed-Loop Navigation Evaluation Harness
 
 A ROS 2 package that uses [BehaviorTree.CPP v4](https://www.behaviortree.dev/) to implement a mission-level autonomous task: navigate a robot to a target, check battery and obstacle state in real time, and automatically re-route around obstacles when the primary path fails.
 
